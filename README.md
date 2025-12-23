@@ -365,7 +365,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **[Your Name]**
 - GitHub: [@kwang-min13](https://github.com/kwang-min13)
-- Email: your.email@example.com
+- Email: nkm199958@gmail.com
 - LinkedIn: [Your LinkedIn](https://linkedin.com/in/yourprofile)
 
 ---
