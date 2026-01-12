@@ -1,0 +1,70 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb_checkpoints
+
+# DuckDB
+*.db
+*.duckdb
+*.wal
+
+# Data files
+data/raw/*.csv
+data/raw/*.parquet
+data/raw/images/
+data/processed/*.csv
+data/processed/*.parquet
+data/features/*.parquet
+
+# Models
+models/artifacts/*.pkl
+models/artifacts/*.txt
+models/artifacts/*.bin
+mlruns/
+mlartifacts/
+
+# Logs
+logs/*.log
+logs/*.txt
+*.log
+
+# Reports
+reports/*.html
+reports/*.pdf
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Environment
+.env
+.env.local
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Large files
+*.zip
+*.tar.gz
+*.7z

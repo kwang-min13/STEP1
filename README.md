@@ -217,20 +217,25 @@ graph TB
 git clone https://github.com/kwang-min13/STEP1.git
 cd STEP1
 
-# 2. 가상환경 생성
+# 2. 가상환경 생성 (권장)
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+venv\Scripts\activate  # Windows
+# source venv/bin/activate  # macOS/Linux
 
 # 3. 의존성 설치
 pip install -r requirements.txt
 
-# 4. Ollama 설치 및 모델 다운로드
-# https://ollama.ai 에서 설치
-ollama pull llama3
+# 4. 데이터셋 다운로드 (수동)
+# https://www.kaggle.com/competitions/h-and-m-personalized-fashion-recommendations/data
+# 위 링크에서 데이터 다운로드 후 data/raw/ 폴더에 압축 해제
+# 상세 가이드: data/DATA_DOWNLOAD_GUIDE.md 참조
 
-# 5. Kaggle 데이터셋 다운로드
-kaggle competitions download -c h-and-m-personalized-fashion-recommendations
-unzip h-and-m-personalized-fashion-recommendations.zip -d data/raw/
+# 5. 환경 검증
+python scripts/validate_environment.py
+
+# 6. Ollama 설치 (Phase 6에서 필요)
+# https://ollama.ai 에서 설치 후
+# ollama pull llama3
 ```
 
 ### Quick Start
