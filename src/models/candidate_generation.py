@@ -77,8 +77,8 @@ class CandidateGenerator:
         """
         con = self.connect()
         
-        # 최적화: 최근 28일 데이터만 사용
-        cf_query = f"""
+        # 최적화: 최근 28일 데이터만 사용 + SQL injection 방지
+        cf_query = """
             WITH recent_transactions AS (
                 SELECT customer_id, article_id, t_dat
                 FROM read_csv_auto('data/raw/transactions_train.csv')
@@ -87,21 +87,21 @@ class CandidateGenerator:
             user_items AS (
                 SELECT article_id
                 FROM recent_transactions
-                WHERE customer_id = '{user_id}'
+                WHERE customer_id = ?
                 ORDER BY t_dat DESC
-                LIMIT {recent_items}
+                LIMIT ?
             ),
             user_purchased AS (
                 SELECT DISTINCT article_id
                 FROM recent_transactions
-                WHERE customer_id = '{user_id}'
+                WHERE customer_id = ?
             ),
             similar_users AS (
                 -- 같은 상품을 구매한 유저들
                 SELECT DISTINCT rt.customer_id
                 FROM recent_transactions rt
                 INNER JOIN user_items ui ON rt.article_id = ui.article_id
-                WHERE rt.customer_id != '{user_id}'
+                WHERE rt.customer_id != ?
                 LIMIT 1000
             ),
             candidate_items AS (
@@ -114,13 +114,13 @@ class CandidateGenerator:
                 WHERE rt.article_id NOT IN (SELECT article_id FROM user_purchased)
                 GROUP BY rt.article_id
                 ORDER BY purchase_count DESC
-                LIMIT {top_k}
+                LIMIT ?
             )
             SELECT article_id
             FROM candidate_items
         """
         
-        result = con.execute(cf_query).fetchall()
+        result = con.execute(cf_query, [user_id, recent_items, user_id, user_id, top_k]).fetchall()
         return [row[0] for row in result]
     
     def merge_candidates(self,

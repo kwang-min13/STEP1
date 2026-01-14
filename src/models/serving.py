@@ -6,8 +6,9 @@ Recommendation Serving Module
 
 import polars as pl
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import logging
+import numpy as np
 
 from .candidate_generation import CandidateGenerator
 from .ranker import PurchaseRanker
@@ -27,10 +28,10 @@ class RecommendationService:
         Args:
             model_path: 학습된 모델 경로
         """
-        self.model_path = model_path
-        self.ranker = None
-        self.candidate_gen = CandidateGenerator()
-        self.feature_store = FeatureStore()
+        self.model_path: str = model_path
+        self.ranker: Optional[PurchaseRanker] = None
+        self.candidate_gen: CandidateGenerator = CandidateGenerator()
+        self.feature_store: FeatureStore = FeatureStore()
         
         # 모델 로드
         self._load_model()
@@ -108,12 +109,20 @@ class RecommendationService:
                 'optimal_send_time': int(user_row[0]) if user_row[0] else 12
             }
         
-        scores = self.ranker.predict(features_df)
-        
-        # 6. Top K 추출
-        top_indices = scores.argsort()[-top_k:][::-1]
-        top_items = [item_features.row(int(idx), named=True)['article_id'] for idx in top_indices]
-        top_scores = [float(scores[idx]) for idx in top_indices]
+        try:
+            scores = self.ranker.predict(features_df)
+            
+            # 6. Top K 추출
+            top_indices = np.argsort(scores)[-top_k:][::-1]
+            top_items = [item_features.row(int(idx), named=True)['article_id'] for idx in top_indices]
+            top_scores = [float(scores[idx]) for idx in top_indices]
+        except Exception as e:
+            logger.error(f"예측 중 오류 발생: {e}")
+            return {
+                'user_id': user_id,
+                'recommendations': candidates[:top_k],
+                'optimal_send_time': int(user_row[0]) if user_row[0] else 12
+            }
         
         # 7. 최적 발송 시간 (유저의 평균 구매 시간)
         optimal_hour = int(user_row[0]) if user_row[0] else 12

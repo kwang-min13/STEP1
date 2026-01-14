@@ -38,13 +38,13 @@ def main(sample_size: int = 100):
     logger.info("\n[1/3] Recommendation Service 초기화 중...")
     service = RecommendationService()
     
-    # 2. 샘플 유저 추출
+    # 2. 샘플 유저 추출 (최적화: hash 기반 샘플링)
     logger.info(f"\n[2/3] 샘플 유저 {sample_size}명 추출 중...")
     con = duckdb.connect(':memory:')
     sample_users = con.execute(f"""
         SELECT customer_id 
         FROM read_parquet('data/features/user_features.parquet')
-        ORDER BY RANDOM()
+        ORDER BY abs(hash(customer_id))
         LIMIT {sample_size}
     """).fetchall()
     con.close()

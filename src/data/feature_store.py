@@ -56,15 +56,15 @@ class FeatureStore:
         if user_ids is None:
             # 전체 유저 Feature 조회
             query = f"SELECT * FROM read_parquet('{user_features_path}')"
+            result = con.execute(query).fetch_df()
         else:
-            # 특정 유저 Feature 조회
-            user_ids_str = "', '".join(user_ids)
+            # 특정 유저 Feature 조회 (SQL injection 방지)
             query = f"""
                 SELECT * FROM read_parquet('{user_features_path}')
-                WHERE customer_id IN ('{user_ids_str}')
+                WHERE customer_id IN (SELECT unnest(?))
             """
+            result = con.execute(query, [user_ids]).fetch_df()
         
-        result = con.execute(query).fetch_df()
         return pl.from_pandas(result)
     
     def get_item_features(self, item_ids: Optional[List[str]] = None) -> pl.DataFrame:
@@ -86,15 +86,15 @@ class FeatureStore:
         if item_ids is None:
             # 전체 상품 Feature 조회
             query = f"SELECT * FROM read_parquet('{item_features_path}')"
+            result = con.execute(query).fetch_df()
         else:
-            # 특정 상품 Feature 조회
-            item_ids_str = "', '".join(item_ids)
+            # 특정 상품 Feature 조회 (SQL injection 방지)
             query = f"""
                 SELECT * FROM read_parquet('{item_features_path}')
-                WHERE article_id IN ('{item_ids_str}')
+                WHERE article_id IN (SELECT unnest(?))
             """
+            result = con.execute(query, [item_ids]).fetch_df()
         
-        result = con.execute(query).fetch_df()
         return pl.from_pandas(result)
     
     def get_top_items(self, top_k: int = 100) -> pl.DataFrame:
