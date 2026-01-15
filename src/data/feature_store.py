@@ -32,9 +32,17 @@ class FeatureStore:
         self.con: Optional[duckdb.DuckDBPyConnection] = None
     
     def connect(self):
-        """DuckDB 연결"""
+        """DuckDB 연결 (메모리 데이터베이스 사용)"""
         if self.con is None:
-            self.con = duckdb.connect(self.db_path)
+            # Use in-memory database to avoid file locking
+            self.con = duckdb.connect(":memory:")
+            # Attach the file database in read-only mode if it exists
+            if self.db_path != ":memory:":
+                try:
+                    self.con.execute(f"ATTACH '{self.db_path}' AS filedb (READ_ONLY)")
+                except Exception:
+                    # If attach fails, continue with in-memory only
+                    pass
         return self.con
     
     def get_user_features(self, user_ids: Optional[List[str]] = None) -> pl.DataFrame:

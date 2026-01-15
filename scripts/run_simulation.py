@@ -166,7 +166,6 @@ def run_ab_test(num_users: int = 20, mode: str = "fast", llm: Optional[int] = No
                 'send_time': result['send_time'],
                 'num_items': result['num_items'],
                 'purchase_count': result.get('purchase_count', 0),
-                'satisfaction': result.get('satisfaction', 0),
                 'persona_age': persona.get('age'),
                 'persona_budget': persona.get('budget'),
                 'timestamp': pd.Timestamp.now()

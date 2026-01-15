@@ -66,8 +66,7 @@ class ABTestSimulator:
             'items': popular_items,
             'send_time': send_time,
             'num_items': len(popular_items),
-            'purchase_count': evaluation.get('purchase_count', 0),
-            'satisfaction': evaluation.get('satisfaction', 0)
+            'purchase_count': evaluation.get('purchase_count', 0)
         }
     
     def simulate_group_b(self, user_id: str, virtual_user: VirtualUser) -> Dict[str, Any]:
@@ -92,7 +91,7 @@ class ABTestSimulator:
             evaluation = virtual_user.evaluate_recommendations(rec_items)
         else:
             # 추천이 없으면 기본값
-            evaluation = {'purchase_count': 0, 'satisfaction': 0}
+            evaluation = {'purchase_count': 0}
         
         # 클릭 여부: 구매 예상이 1개 이상이면 클릭
         clicked = evaluation.get('purchase_count', 0) > 0
@@ -102,8 +101,7 @@ class ABTestSimulator:
             'items': rec_items,
             'send_time': optimal_time,
             'num_items': len(rec_items),
-            'purchase_count': evaluation.get('purchase_count', 0),
-            'satisfaction': evaluation.get('satisfaction', 0)
+            'purchase_count': evaluation.get('purchase_count', 0)
         }
     
     def close(self):

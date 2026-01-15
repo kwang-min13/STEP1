@@ -1,7 +1,11 @@
 """
-Virtual User Module
+Enhanced Virtual User Module with Realistic Shopping Patterns
 
-LLM 기반 가상 유저 페르소나 생성 (optimized)
+개선된 Fallback 페르소나:
+- 나이-예산 상관관계
+- 나이-스타일 선호도
+- 성별-카테고리 선호도
+- 예산-구매빈도 상관관계
 """
 
 import random
@@ -17,16 +21,16 @@ logger = logging.getLogger(__name__)
 
 
 class VirtualUser:
-    """가상 유저 클래스"""
+    """가상 유저 클래스 (Enhanced with realistic patterns)"""
 
     def __init__(self, ollama_client: Optional[OllamaClient] = None):
         """
         Args:
             ollama_client: Ollama 클라이언트 (선택사항)
-              - None이면 LLM을 사용하지 않음(중요: 기존 코드는 None이어도 OllamaClient를 생성했음)
+              - None이면 LLM을 사용하지 않음
         """
-        self.ollama_client = ollama_client  # ✅ None이면 LLM 완전 미사용
-        self._llm_available: Optional[bool] = None  # ✅ 연결 체크 캐시
+        self.ollama_client = ollama_client
+        self._llm_available: Optional[bool] = None
         self.persona: Dict[str, Any] = {}
 
     def _is_llm_available(self) -> bool:
@@ -47,7 +51,7 @@ class VirtualUser:
         gender = random.choice(["Male", "Female", "Non-binary"])
 
         if self._is_llm_available():
-            # ✅ JSON만 출력 강제 (장문 설명 방지)
+            # LLM 모드
             prompt = (
                 f"Generate a realistic shopping persona for a {age}-year-old {gender} customer.\n"
                 "Return ONLY valid JSON. No prose, no markdown, no code fences.\n"
@@ -59,16 +63,16 @@ class VirtualUser:
                 "- categories: array of 2-3 strings\n"
             )
 
-            # ✅ 핵심 최적화: 출력 길이 제한 + 불필요한 추가 문단 차단
             response = self.ollama_client.generate(
                 prompt,
                 temperature=0.6,
                 num_predict=140,
                 stop=["\n\n"]
             )
-            persona_details = self._parse_persona_json(response) if response else self._fallback_persona()
+            persona_details = self._parse_persona_json(response) if response else self._fallback_persona_realistic(age, gender)
         else:
-            persona_details = self._fallback_persona()
+            # Enhanced Fallback 모드 (현실적 패턴 반영)
+            persona_details = self._fallback_persona_realistic(age, gender)
 
         self.persona = {"age": age, "gender": gender, **persona_details}
         return self.persona
@@ -79,7 +83,7 @@ class VirtualUser:
             start = response.find("{")
             end = response.rfind("}") + 1
             if start == -1 or end <= start:
-                return self._fallback_persona()
+                return self._fallback_persona_realistic(30, "Male")  # Default fallback
 
             obj = json.loads(response[start:end])
 
@@ -110,36 +114,30 @@ class VirtualUser:
                 "categories": categories,
             }
         except Exception:
-            return self._fallback_persona()
+            return self._fallback_persona_realistic(30, "Male")
 
-    def _fallback_persona(self) -> Dict[str, Any]:
+    def _fallback_persona_realistic(self, age: int, gender: str) -> Dict[str, Any]:
         """
-        H&M 실제 데이터 기반 페르소나 생성
+        현실적인 쇼핑 패턴을 반영한 Fallback 페르소나
         
-        데이터 소스: 31.7M 거래, 1.3M 사용자
         반영된 패턴:
-        1. 나이-예산 분포 (약한 상관관계)
-        2. 전체 카테고리 분포 (tops/bottoms 압도적)
-        3. 전체 구매 빈도 분포 (monthly 53%)
-        4. 예산-빈도 상관관계 (약한 상관관계)
+        1. 나이-예산 상관관계 (젊을수록 low, 중년 medium, 장년 high)
+        2. 나이-스타일 선호도 (젊을수록 trendy, 나이들수록 classic)
+        3. 성별-카테고리 선호도
+        4. 예산-구매빈도 상관관계
         """
-        # 기본 속성 생성 (이미 generate_persona에서 생성됨)
-        # 여기서는 age를 참조하기 위해 self.persona에서 가져옴
-        age = self.persona.get('age', 30) if self.persona else 30
-        gender = self.persona.get('gender', 'Male') if self.persona else 'Male'
         
-        # 1. 나이 기반 예산 분포 (실제 H&M 데이터)
-        budget = self._get_budget_by_age_real(age)
+        # 1. 나이 기반 예산 분포 (현실적 가중치)
+        budget = self._get_budget_by_age(age)
         
-        # 2. 스타일 선택 (데이터 없음 - 균등 분포 사용)
-        styles = ["casual", "formal", "sporty", "trendy", "vintage"]
-        style = random.choice(styles)
+        # 2. 나이 기반 스타일 선호도
+        style = self._get_style_by_age(age)
         
-        # 3. 예산 기반 구매 빈도 (실제 H&M 데이터)
-        frequency = self._get_frequency_by_budget_real(budget)
+        # 3. 예산 기반 구매 빈도
+        frequency = self._get_frequency_by_budget(budget)
         
-        # 4. 전체 카테고리 분포 (실제 H&M 데이터)
-        categories = self._get_categories_real()
+        # 4. 성별 기반 카테고리 선호도
+        categories = self._get_categories_by_gender(gender)
 
         return {
             "style": style,
@@ -148,91 +146,122 @@ class VirtualUser:
             "categories": categories,
         }
 
-    def _get_budget_by_age_real(self, age: int) -> str:
+    def _get_budget_by_age(self, age: int) -> str:
         """
-        실제 H&M 데이터 기반 나이-예산 분포
+        나이에 따른 예산 분포 (현실적 가중치)
         
-        데이터 출처: data/shopping_patterns.json
-        - 18-25: low=41.2%, medium=42.1%, high=16.6%
-        - 26-35: low=38.7%, medium=41.0%, high=20.4%
-        - 36-50: low=39.8%, medium=41.2%, high=19.0%
-        - 51-65: low=35.2%, medium=42.8%, high=22.0%
+        - 18-25: low(60%), medium(30%), high(10%)
+        - 26-35: low(30%), medium(50%), high(20%)
+        - 36-50: low(20%), medium(40%), high(40%)
+        - 51-65: low(15%), medium(35%), high(50%)
         """
         if age <= 25:
-            # 18-25세: low 약간 높음
             return random.choices(
                 ["low", "medium", "high"],
-                weights=[41.2, 42.1, 16.6]
+                weights=[60, 30, 10]
             )[0]
         elif age <= 35:
-            # 26-35세: 균형잡힌 분포
             return random.choices(
                 ["low", "medium", "high"],
-                weights=[38.7, 41.0, 20.4]
+                weights=[30, 50, 20]
             )[0]
         elif age <= 50:
-            # 36-50세: medium 우세
             return random.choices(
                 ["low", "medium", "high"],
-                weights=[39.8, 41.2, 19.0]
+                weights=[20, 40, 40]
             )[0]
         else:  # 51-65
-            # 51-65세: high 약간 증가
             return random.choices(
                 ["low", "medium", "high"],
-                weights=[35.2, 42.8, 22.0]
+                weights=[15, 35, 50]
             )[0]
 
-    def _get_frequency_by_budget_real(self, budget: str) -> str:
+    def _get_style_by_age(self, age: int) -> str:
         """
-        실제 H&M 데이터 기반 예산-빈도 분포
+        나이에 따른 스타일 선호도
         
-        데이터 출처: data/shopping_patterns.json
-        - low: weekly=22.0%, monthly=51.8%, occasionally=26.2%
-        - medium: weekly=21.7%, monthly=55.1%, occasionally=23.2%
-        - high: weekly=24.6%, monthly=40.8%, occasionally=34.6%
+        - 18-25: trendy(40%), casual(30%), sporty(20%), formal(5%), vintage(5%)
+        - 26-35: casual(35%), trendy(25%), sporty(20%), formal(15%), vintage(5%)
+        - 36-50: casual(40%), formal(25%), sporty(15%), trendy(10%), vintage(10%)
+        - 51-65: casual(35%), formal(30%), vintage(20%), sporty(10%), trendy(5%)
+        """
+        if age <= 25:
+            return random.choices(
+                ["trendy", "casual", "sporty", "formal", "vintage"],
+                weights=[40, 30, 20, 5, 5]
+            )[0]
+        elif age <= 35:
+            return random.choices(
+                ["casual", "trendy", "sporty", "formal", "vintage"],
+                weights=[35, 25, 20, 15, 5]
+            )[0]
+        elif age <= 50:
+            return random.choices(
+                ["casual", "formal", "sporty", "trendy", "vintage"],
+                weights=[40, 25, 15, 10, 10]
+            )[0]
+        else:  # 51-65
+            return random.choices(
+                ["casual", "formal", "vintage", "sporty", "trendy"],
+                weights=[35, 30, 20, 10, 5]
+            )[0]
+
+    def _get_frequency_by_budget(self, budget: str) -> str:
+        """
+        예산에 따른 구매 빈도
+        
+        - low: occasionally(70%), monthly(25%), weekly(5%)
+        - medium: monthly(50%), occasionally(30%), weekly(20%)
+        - high: weekly(50%), monthly(35%), occasionally(15%)
         """
         if budget == "low":
             return random.choices(
-                ["weekly", "monthly", "occasionally"],
-                weights=[22.0, 51.8, 26.2]
+                ["occasionally", "monthly", "weekly"],
+                weights=[70, 25, 5]
             )[0]
         elif budget == "medium":
             return random.choices(
-                ["weekly", "monthly", "occasionally"],
-                weights=[21.7, 55.1, 23.2]
+                ["monthly", "occasionally", "weekly"],
+                weights=[50, 30, 20]
             )[0]
         else:  # high
             return random.choices(
                 ["weekly", "monthly", "occasionally"],
-                weights=[24.6, 40.8, 34.6]
+                weights=[50, 35, 15]
             )[0]
 
-    def _get_categories_real(self) -> List[str]:
+    def _get_categories_by_gender(self, gender: str) -> List[str]:
         """
-        실제 H&M 데이터 기반 전체 카테고리 분포
+        성별에 따른 카테고리 선호도
         
-        데이터 출처: data/shopping_patterns.json
-        - tops: 33.4%
-        - bottoms: 33.9%
-        - dresses: 20.4%
-        - shoes: 2.0%
-        - accessories: 3.4%
-        - outerwear: 6.9%
-        
-        참고: 나이/성별과 무관하게 유사한 분포
+        - Male: tops(30%), bottoms(25%), shoes(20%), outerwear(15%), accessories(10%)
+        - Female: dresses(25%), tops(20%), shoes(20%), accessories(20%), bottoms(15%)
+        - Non-binary: 균등 분포
         """
         all_categories = ["tops", "bottoms", "dresses", "shoes", "accessories", "outerwear"]
         
-        # 실제 H&M 전체 분포 (반올림)
-        weights = [33.4, 33.9, 20.4, 2.0, 3.4, 6.9]
+        if gender == "Male":
+            # Male은 dresses 선호도 낮음
+            weights = [30, 25, 5, 20, 10, 15]  # tops, bottoms, dresses, shoes, accessories, outerwear
+        elif gender == "Female":
+            # Female은 dresses, accessories 선호도 높음
+            weights = [20, 15, 25, 20, 20, 10]
+        else:  # Non-binary
+            # 균등 분포
+            weights = [20, 20, 15, 20, 15, 10]
         
-        # 가중치 기반으로 2개 선택
-        selected = []
-        while len(selected) < 2:
-            cat = random.choices(all_categories, weights=weights)[0]
-            if cat not in selected:
-                selected.append(cat)
+        # 가중치 기반으로 2개 선택 (중복 없음)
+        selected = random.choices(
+            all_categories,
+            weights=weights,
+            k=2
+        )
+        
+        # 중복 제거 (혹시 모를 경우)
+        if selected[0] == selected[1]:
+            # 다른 카테고리 선택
+            remaining = [c for c in all_categories if c != selected[0]]
+            selected[1] = random.choice(remaining)
         
         return selected
 
@@ -249,7 +278,6 @@ class VirtualUser:
         satisfaction = 3
 
         if self._is_llm_available():
-            # ✅ 한 줄만 출력 강제 (장문 응답 방지)
             prompt = (
                 f"You are a {self.persona['age']}-year-old {self.persona['gender']} shopper.\n"
                 f"Style: {self.persona.get('style','casual')}. "
