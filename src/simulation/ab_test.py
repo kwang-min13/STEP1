@@ -24,19 +24,18 @@ class ABTestSimulator:
     
     def __init__(self, 
                  ollama_client: Optional[OllamaClient],
-                 rec_service: RecommendationService,
-                 candidate_gen: CandidateGenerator):
+                 rec_service: RecommendationService):
         """
         초기화
         
         Args:
             ollama_client: Ollama 클라이언트 (None이면 LLM 미사용)
             rec_service: 추천 서비스
-            candidate_gen: 후보군 생성기
         """
         self.ollama_client = ollama_client
         self.rec_service = rec_service
-        self.candidate_gen = candidate_gen
+        # rec_service 내부의 candidate_gen 사용 (중복 생성 방지)
+        self.candidate_gen = rec_service.candidate_gen
     
     def simulate_group_a(self, user_id: str, virtual_user: VirtualUser) -> Dict[str, Any]:
         """
@@ -106,10 +105,18 @@ class ABTestSimulator:
     
     def close(self):
         """리소스 정리"""
+        # rec_service.close()가 내부적으로 candidate_gen도 정리하므로
+        # rec_service만 닫으면 됨
         if self.rec_service:
-            self.rec_service.close()
-        if self.candidate_gen:
-            self.candidate_gen.close()
+            try:
+                self.rec_service.close()
+            except Exception as e:
+                logger.error(f"rec_service 종료 실패: {e}")
+        
+        # candidate_gen은 별도로 생성된 경우에만 닫음
+        # (현재 구조에서는 rec_service가 관리하므로 주석 처리)
+        # if self.candidate_gen:
+        #     self.candidate_gen.close()
 
 
 if __name__ == "__main__":
@@ -123,13 +130,11 @@ if __name__ == "__main__":
     from src.simulation.ab_test import ABTestSimulator
     from src.simulation.virtual_user import VirtualUser
     from src.models.serving import RecommendationService
-    from src.models.candidate_generation import CandidateGenerator
     
     # LLM 없이 테스트
     simulator = ABTestSimulator(
         ollama_client=None,
-        rec_service=RecommendationService(),
-        candidate_gen=CandidateGenerator()
+        rec_service=RecommendationService()
     )
     
     virtual_user = VirtualUser(ollama_client=None)
@@ -165,3 +170,4 @@ if __name__ == "__main__":
     logger.info("=" * 60)
     
     simulator.close()
+
